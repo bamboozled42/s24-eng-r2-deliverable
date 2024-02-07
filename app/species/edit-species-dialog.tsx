@@ -1,6 +1,5 @@
 "use client";
 
-import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,15 +13,16 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { createBrowserSupabaseClient } from "@/lib/client-utils";
+import type { Database } from "@/lib/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState, type BaseSyntheticEvent } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import WikipediaSearchFunction from "./search-wikipedia";
-
+type Species = Database["public"]["Tables"]["species"]["Row"];
 // We use zod (z) to define a schema for the "Add species" form.
 // zod handles validation of the input values with methods like .string(), .nullable(). It also processes the form inputs with .transform() before the inputs are sent to the database.
 
@@ -54,34 +54,30 @@ const speciesSchema = z.object({
     .nullable()
     // Transform empty string or only whitespace input to null before form submission, and trim whitespace otherwise
     .transform((val) => (!val || val.trim() === "" ? null : val.trim())),
-  //url: z
-  //.string()
-  //.nullable()
-  // Transform empty string or only whitespace input to null before form submission, and trim whitespace otherwise
-  //.transform((val) => (!val || val.trim() === "" ? null : val.trim())),
 });
 
 type FormData = z.infer<typeof speciesSchema>;
-
-// Default values for the form fields.
-/* Because the react-hook-form (RHF) used here is a controlled form (not an uncontrolled form),
+//clears the dialog after data successfully goes through
+export default function EditSpeciesDialog({ species }: { species: Species }) {
+  const router = useRouter();
+  const handleCancel = () => {
+    form.reset(defaultValues);
+  };
+  // Default values for the form fields.
+  /* Because the react-hook-form (RHF) used here is a controlled form (not an uncontrolled form),
 fields that are nullable/not required should explicitly be set to `null` by default.
 Otherwise, they will be `undefined` by default, which will raise warnings because `undefined` conflicts with controlled components.
 All form fields should be set to non-undefined default values.
 Read more here: https://legacy.react-hook-form.com/api/useform/
 */
-const defaultValues: Partial<FormData> = {
-  scientific_name: "",
-  common_name: null,
-  kingdom: "Animalia",
-  total_population: null,
-  image: "",
-  description: "",
-};
-
-export default function AddSpeciesDialog({ userId }: { userId: string }) {
-  const router = useRouter();
-
+  const defaultValues: Partial<FormData> = {
+    scientific_name: species.scientific_name,
+    common_name: species.common_name,
+    kingdom: species.kingdom,
+    total_population: species.total_population,
+    image: species.image,
+    description: species.description,
+  };
   // Control open/closed state of the dialog
   const [open, setOpen] = useState<boolean>(false);
 
@@ -95,69 +91,61 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
   const onSubmit = async (input: FormData) => {
     // The `input` prop contains data that has already been processed by zod. We can now use it in a supabase query
     const supabase = createBrowserSupabaseClient();
-    const { error } = await supabase.from("species").insert([
-      {
-        author: userId,
-        common_name: input.common_name,
-        description: input.description,
-        kingdom: input.kingdom,
-        scientific_name: input.scientific_name,
-        total_population: input.total_population,
-        image: input.image,
-      },
-    ]);
 
-    // Catch and report errors from Supabase and exit the onSubmit function with an early 'return' if an error occurred.
-    if (error) {
+    const editConfirmed = window.confirm("Are you sure you want to edit the species?");
+    if (editConfirmed) {
+      const { error } = await supabase
+        .from("species")
+        .update({
+          common_name: input.common_name,
+          description: input.description,
+          kingdom: input.kingdom,
+          scientific_name: input.scientific_name,
+          total_population: input.total_population,
+          image: input.image,
+        })
+        .eq("id", species.id);
+
+      // Catch and report errors from Supabase and exit the onSubmit function with an early 'return' if an error occurred.
+      if (error) {
+        return toast({
+          title: "Something went wrong.",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+
+      // Because Supabase errors were caught above, the remainder of the function will only execute upon a successful edit
+
+      // Reset form values to the default (empty) values.
+      // Practically, this line can be removed because router.refresh() also resets the form. However, we left it as a reminder that you should generally consider form "cleanup" after an add/edit operation.
+      form.reset(defaultValues);
+      setOpen(false);
+
+      // Refresh all server components in the current route. This helps display the newly created species because species are fetched in a server component, species/page.tsx.
+      // Refreshing that server component will display the new species from Supabase
+      router.refresh();
       return toast({
-        title: "Something went wrong.",
-        description: error.message,
-        variant: "destructive",
+        title: "Species Edited!",
+        description: "Successfully edited " + input.scientific_name + ".",
       });
     }
-
-    // Because Supabase errors were caught above, the remainder of the function will only execute upon a successful edit
-
-    // Reset form values to the default (empty) values.
-    // Practically, this line can be removed because router.refresh() also resets the form. However, we left it as a reminder that you should generally consider form "cleanup" after an add/edit operation.
-    form.reset(defaultValues);
-
-    setOpen(false);
-
-    // Refresh all server components in the current route. This helps display the newly created species because species are fetched in a server component, species/page.tsx.
-    // Refreshing that server component will display the new species from Supabase
-    router.refresh();
-
-    return toast({
-      title: "New species added!",
-      description: "Successfully added " + input.scientific_name + ".",
-    });
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="secondary">
-          <Icons.add className="mr-3 h-5 w-5" />
-          Add Species
+        <Button className="ml-1 mr-1 flex-auto" variant="default" style={{ flex: 1 }}>
+          Edit
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-screen overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Add Species</DialogTitle>
+          <DialogTitle>Edit Species</DialogTitle>
           <DialogDescription>
-            Add a new species here. Click &quot;Add Species&quot; below when you&apos;re done.
+            Edit your existing species here. Click &quot;Edit Species&quot; below when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
-        {/* passes form functions as props to search wikipedia. These control the state of the function*/}
-        <WikipediaSearchFunction
-          setUrl={(new_url: string) => {
-            form.setValue("image", new_url);
-          }}
-          setDescription={(new_description: string) => {
-            form.setValue("description", new_description);
-          }}
-        />
         <Form {...form}>
           <form onSubmit={(e: BaseSyntheticEvent) => void form.handleSubmit(onSubmit)(e)}>
             <div className="grid w-full items-center gap-4">
@@ -244,19 +232,13 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                 control={form.control}
                 name="image"
                 render={({ field }) => {
+                  // We must extract value from field and convert a potential defaultValue of `null` to "" because inputs can't handle null values: https://github.com/orgs/react-hook-form/discussions/4091
                   const { value, ...rest } = field;
-                  // using the 'image' state for the input value
-                  // 'image' is always a string to avoid null or undefined values
-                  // Recieves change in variable state from search wikipedia
                   return (
                     <FormItem>
                       <FormLabel>Image URL</FormLabel>
                       <FormControl>
-                        <Input
-                          value={value ?? ""}
-                          placeholder="https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/George_the_amazing_guinea_pig.jpg/440px-George_the_amazing_guinea_pig.jpg"
-                          {...rest} // 
-                        />
+                        <Input value={value ?? ""} placeholder="" {...rest} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -267,14 +249,13 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                 control={form.control}
                 name="description"
                 render={({ field }) => {
+                  // We must extract value from field and convert a potential defaultValue of `null` to "" because textareas can't handle null values: https://github.com/orgs/react-hook-form/discussions/4091
                   const { value, ...rest } = field;
-                  // Directly use the 'description' state for the input value
-                  // 'description' is always a string to avoid null or undefined values
                   return (
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Input
+                        <Textarea
                           value={value ?? ""}
                           placeholder="The guinea pig or domestic guinea pig, also known as the cavy or domestic cavy, is a species of rodent belonging to the genus Cavia in the family Caviidae."
                           {...rest}
@@ -287,10 +268,11 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
               />
               <div className="flex">
                 <Button type="submit" className="ml-1 mr-1 flex-auto">
-                  Add Species
+                  Edit Species
                 </Button>
+
                 <DialogClose asChild>
-                  <Button type="button" className="ml-1 mr-1 flex-auto" variant="secondary">
+                  <Button type="button" className="ml-1 mr-1 flex-auto" variant="secondary" onClick={handleCancel}>
                     Cancel
                   </Button>
                 </DialogClose>
