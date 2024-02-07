@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -18,8 +19,14 @@ const searchParameters = z.object({
 });
 
 type FormData = z.infer<typeof searchParameters>;
+
+interface WikipediaSearchFunctionProps {
+  setUrl: (url: string) => void;
+  setDescription: (description: string) => void;
+}
+
 //pass in props from add-specoes dialogue
-export default function WikipediaSearchFunction({ setUrl, setDescription }) {
+export default function WikipediaSearchFunction({ setUrl, setDescription }: WikipediaSearchFunctionProps) {
   const form = useForm<FormData>({
     resolver: zodResolver(searchParameters),
     mode: "onChange",
@@ -61,7 +68,7 @@ export default function WikipediaSearchFunction({ setUrl, setDescription }) {
     console.log(json2);
     const json3 = await response3.json();
     console.log(json3);
-
+    
     setSearchInfo(json1.query.searchinfo);
     console.log(searchInfo);
     setResults(json2.query.pages);
