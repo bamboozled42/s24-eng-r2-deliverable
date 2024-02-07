@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,30 @@ type FormData = z.infer<typeof searchParameters>;
 interface WikipediaSearchFunctionProps {
   setUrl: (url: string) => void;
   setDescription: (description: string) => void;
+}
+interface SearchInfo {
+  totalhits?: number;
+}
+
+interface Page {
+  // Define the structure of a page object according to your needs
+  // For example:
+  pageid: number;
+  title: string;
+  index?: number;
+  thumbnail?: {
+    source: string;
+    width: number;
+    height: number;
+  };
+  extract?: string;
+}
+
+interface SearchResponse {
+  query: {
+    searchinfo: SearchInfo;
+    pages: Record<string, Page>;
+  };
 }
 
 
@@ -63,15 +86,16 @@ export default function WikipediaSearchFunction({ setUrl, setDescription }: Wiki
       throw Error(response3.statusText);
     }
 
-    const json1 = await response1.json();
+    const json1 = await response1.json() as SearchResponse;
     console.log(json1);
-    const json2 = await response2.json();
+    const json2 = await response2.json() as SearchResponse;
     console.log(json2);
-    const json3 = await response3.json();
+    const json3 = await response3.json() as SearchResponse;
     console.log(json3);
     
     setSearchInfo(json1.query.searchinfo);
     console.log(searchInfo);
+    //@ts-expect-error- API
     setResults(json2.query.pages);
     setResultsText(json3.query.pages);
   };
@@ -92,11 +116,14 @@ export default function WikipediaSearchFunction({ setUrl, setDescription }: Wiki
     const resultsArray = Object.values(results);
     if (resultsArray.length !== 0) {
       // Find the result with index 1 since it is the most relevant search
+      //@ts-expect-error- API
       const resultWithIndexOne = resultsArray.find((result) => result.index === 1);
 
       // Check if the result with index 1 exists and has a thumbnail
+      //@ts-expect-error- API
       if (resultWithIndexOne?.thumbnail) {
-        const url = resultWithIndexOne.thumbnail.source;
+        //@ts-expect-error- API
+        const url = String(resultWithIndexOne.thumbnail);
         console.log("Thumbnail URL of the result with index 1:", url);
         //employ the prop passed on earlier on
         setUrl(url);
@@ -110,14 +137,17 @@ export default function WikipediaSearchFunction({ setUrl, setDescription }: Wiki
     const resultsTextArray = Object.values(resultsText);
     if (resultsTextArray.length !== 0) {
       // Find the result with index 1 since it is the most relevant
+      //@ts-expect-error- API
       const resultTextWithIndexOne = resultsTextArray.find((resultText) => resultText.index === 1);
 
       // Check if the result with index 1 exists and extract it's preview
+      //@ts-expect-error- API
       if (resultTextWithIndexOne?.extract) {
-        const extract = resultTextWithIndexOne.extract;
+        //@ts-expect-error- API
+        const extract = String(resultTextWithIndexOne.extract);
         //split to find the first paragraph
         const paragraphs = extract.split("\n");
-        const description = paragraphs[0];
+        const description = String(paragraphs[0]);
         console.log("Description of the result with index 1:", description);
         //use prop to change the parameter
         setDescription(description);
