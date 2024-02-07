@@ -1,4 +1,4 @@
-/* eslint-disable */
+// @ts-nocheck
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ interface WikipediaSearchFunctionProps {
   setUrl: (url: string) => void;
   setDescription: (description: string) => void;
 }
+
 
 //pass in props from add-specoes dialogue
 export default function WikipediaSearchFunction({ setUrl, setDescription }: WikipediaSearchFunctionProps) {
